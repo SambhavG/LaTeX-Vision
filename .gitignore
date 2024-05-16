@@ -1,1 +1,4 @@
 .venv/
+config.json
+generation_config.json
+model.safetensors
