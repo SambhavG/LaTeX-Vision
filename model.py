@@ -9,7 +9,7 @@ import datasets
 from tqdm import tqdm
 
 processor = TrOCRProcessor.from_pretrained("microsoft/trocr-base-stage1")
-
+data_dir = "./dataset"
 
 class IAMDataset(Dataset):
     def __init__(self, root_dir, df, processor, max_target_length=128):
@@ -43,7 +43,6 @@ class IAMDataset(Dataset):
 
 print('**BUILDING DATASET**')
 # create df for dataset
-data_dir = "./dataset"
 text_file = os.path.join(data_dir, "latex.txt")
 with open(text_file, "r") as f:
     lines = f.readlines()
@@ -60,8 +59,8 @@ df = pd.DataFrame({"file_name": file_names, "text": text_labels})
 train_df, test_df = train_test_split(df, test_size=0.2)
 train_df.reset_index(drop=True, inplace=True)
 test_df.reset_index(drop=True, inplace=True)
-train_dataset = IAMDataset(root_dir="./dataset/", df=train_df, processor=processor)
-eval_dataset = IAMDataset(root_dir="./dataset/", df=test_df, processor=processor)
+train_dataset = IAMDataset(root_dir=data_dir+"/", df=train_df, processor=processor)
+eval_dataset = IAMDataset(root_dir=data_dir+"/", df=test_df, processor=processor)
 train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 eval_dataloader = DataLoader(eval_dataset, batch_size=4)
 
@@ -113,7 +112,7 @@ for epoch in range(1):
     valid_cer = 0.0
     with torch.no_grad():
         for batch in tqdm(eval_dataloader):
-            outputs = model.generate(batch["pixel_values"].to(device))
+            outputs = model.generate(batch["pixel_values"].to(device), temperature=0.01, do_sample=True)
             cer = compute_cer(pred_ids=outputs, label_ids=batch["labels"])
             valid_cer += cer
     print("Validation CER:", valid_cer / len(eval_dataloader))
@@ -127,13 +126,13 @@ print('**TESTING MODEL**')
 import random
 finetuned_model = VisionEncoderDecoderModel.from_pretrained("./my_trained_model")
 indices = random.sample(range(1000), 20)
-images = [(i, Image.open(f'./dataset/{i}.png').convert("RGB")) for i in indices]
+images = [(i, Image.open(data_dir + f'/{i}.png').convert("RGB")) for i in indices]
 for i, image in images:
     pixel_values = processor(image, return_tensors="pt").pixel_values
-    generated_ids = finetuned_model.generate(pixel_values)
+    generated_ids = finetuned_model.generate(pixel_values, temperature=0.01, do_sample=True)
     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-    with open('./dataset/latex.txt', 'r') as file:
+    with open(data_dir + '/latex.txt', 'r') as file:
         lines = file.readlines()
         line = lines[i].strip()
 
