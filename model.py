@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import datasets
 from tqdm import tqdm
+import random
 
 processor = TrOCRProcessor.from_pretrained("microsoft/trocr-base-stage1")
 data_dir = "./dataset"
@@ -112,7 +113,7 @@ for epoch in range(1):
     valid_cer = 0.0
     with torch.no_grad():
         for batch in tqdm(eval_dataloader):
-            outputs = model.generate(batch["pixel_values"].to(device), temperature=0.01, do_sample=True)
+            outputs = model.generate(batch["pixel_values"].to(device), temperature=0.1, do_sample=True)
             cer = compute_cer(pred_ids=outputs, label_ids=batch["labels"])
             valid_cer += cer
     print("Validation CER:", valid_cer / len(eval_dataloader))
@@ -123,13 +124,12 @@ model.save_pretrained(save_directory)
 
 
 print('**TESTING MODEL**')
-import random
 finetuned_model = VisionEncoderDecoderModel.from_pretrained("./my_trained_model")
 indices = random.sample(range(1000), 20)
 images = [(i, Image.open(data_dir + f'/{i}.png').convert("RGB")) for i in indices]
 for i, image in images:
     pixel_values = processor(image, return_tensors="pt").pixel_values
-    generated_ids = finetuned_model.generate(pixel_values, temperature=0.01, do_sample=True)
+    generated_ids = finetuned_model.generate(pixel_values, temperature=0.1, do_sample=True)
     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
     with open(data_dir + '/latex.txt', 'r') as file:
